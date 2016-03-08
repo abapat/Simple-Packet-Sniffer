@@ -1,17 +1,32 @@
 //Amit Bapat
+#include <stdio.h>
+#include <stdlib.h>
+#include <unistd.h>
+#include <string.h>
+#include <time.h>
+#include <pcap.h>
+#include <arpa/inet.h>
 
+#ifdef LINUX
+#include <netinet/ether.h>
+#endif
+ 
+#include <netinet/if_ether.h>
+#include <netinet/in.h>
+#include <netinet/tcp.h>
+#include <netinet/udp.h>
+ 
+#include <fcntl.h>
+#include <getopt.h>
+#include <ifaddrs.h>
+#include <netdb.h>
+#include <signal.h>
+#include <syslog.h>
 /* ethernet headers are always exactly 14 bytes [1] */
 #define SIZE_ETHERNET 14
 
 /* Ethernet addresses are 6 bytes */
 #define ETHER_ADDR_LEN	6
-
-/* Ethernet header */
-struct sniff_ethernet {
-        u_char  ether_dhost[ETHER_ADDR_LEN];    /* destination host address */
-        u_char  ether_shost[ETHER_ADDR_LEN];    /* source host address */
-        u_short ether_type;                     /* IP? ARP? RARP? etc */
-};
 
 /* IP header */
 struct sniff_ip {

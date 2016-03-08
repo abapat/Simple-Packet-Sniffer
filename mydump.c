@@ -1,15 +1,9 @@
 //Amit Bapat
-#include <stdio.h>
-#include <stdlib.h>
-#include <unistd.h>
-#include <pcap.h>
-#include <arpa/inet.h>
-#include <netinet/ether.h>
-
 #include "mydump.h"
 
 void printHelp();
 void printPacket(const u_char *packet, struct pcap_pkthdr header);
+void printTimestamp(struct timeval timestamp);
 void printPayload(const u_char *payload, int len);
 void packetHandler(u_char *args, const struct pcap_pkthdr *header, const u_char *packet);
 
@@ -20,9 +14,16 @@ void printHelp() {
 	exit(0);
 }
 
+void printTimestamp(struct timeval timestamp) {
+	char buf[64];
+	struct tm* now = localtime(&(timestamp.tv_sec));
+	strftime(buf, sizeof buf, "%Y-%m-%d %H:%M:%S", now);
+	printf("[%s.%06d]\n", buf, timestamp.tv_usec);
+}
+
 void printPacket(const u_char *packet, struct pcap_pkthdr header) {	
 	/* declare pointers to packet headers */
-	const struct sniff_ethernet *ethernet;  /* The ethernet header */
+	const struct ether_header *ethernet;  /* The ethernet header */
 	const struct sniff_ip *ip;              /* The IP header */
 	const struct sniff_tcp *tcp;            /* The TCP header */
 	const char *payload;                    /* Packet payload */
@@ -30,12 +31,30 @@ void printPacket(const u_char *packet, struct pcap_pkthdr header) {
 	int size_ip;
 	int size_tcp;
 	int size_payload;
-	
+	int IP_flag = 0;
 	/* define ethernet header */
-	ethernet = (struct sniff_ethernet*)(packet);
-	printf("\tSource MAC address: %s\n", ether_ntoa(ethernet->ether_shost));
-	printf("\tDestination MAC address: %s\n", ether_ntoa(ethernet->ether_dhost));
-
+	ethernet = (struct ether_header*)(packet);
+	uint16_t type = ntohs(ethernet->ether_type);
+	printf("\tEthertype: ");
+	switch (type) {
+		case ETHERTYPE_ARP:
+			printf("ARP\n");
+			break;
+		case ETHERTYPE_IP:
+			printf("IP\n");
+			IP_flag = 1;
+			break;
+		case ETHERTYPE_REVARP:
+			printf("Reverse ARP\n");
+			break;
+		default:
+			printf("Other-- %u\n", (unsigned int) type);
+			break;
+	}
+	printf("\tSource MAC address: %s\n", ether_ntoa((struct ether_addr*) ethernet->ether_shost));
+	printf("\tDestination MAC address: %s\n", ether_ntoa((struct ether_addr*) ethernet->ether_dhost));
+	if (IP_flag == 0)
+		return;
 
 	/* define/compute ip header offset */
 	ip = (struct sniff_ip*)(packet + SIZE_ETHERNET);
@@ -49,22 +68,20 @@ void printPacket(const u_char *packet, struct pcap_pkthdr header) {
 	printf("\tFrom: %s\n", inet_ntoa(ip->ip_src));
 	printf("\tTo: %s\n", inet_ntoa(ip->ip_dst));
 	
-	/* determine protocol */	
+	/* determine protocol */
+	printf("\tProtocol: ");	
 	switch(ip->ip_p) {
 		case IPPROTO_TCP:
-			printf("\tProtocol: TCP\n");
+			printf("TCP\n");
 			break;
 		case IPPROTO_UDP:
-			printf("\tProtocol: UDP\n");
+			printf("UDP\n");
 			return;
 		case IPPROTO_ICMP:
-			printf("\tProtocol: ICMP\n");
-			return;
-		case IPPROTO_IP:
-			printf("\tProtocol: IP\n");
+			printf("ICMP\n");
 			return;
 		default:
-			printf("\tProtocol: unknown\n");
+			printf("Other\n");
 			return;
 	}
 	
@@ -94,13 +111,15 @@ void printPacket(const u_char *packet, struct pcap_pkthdr header) {
 	 * treat it as a string.
 	 */
 	if (size_payload > 0) {
-		printf("\tPayload (%d bytes):\n", size_payload);
-		printf("\t%s", payload);
+		printf("\tPayload (%d bytes)\n", size_payload);
+		//printf("\t%s", payload);
 	}
 }
 
 void packetHandler(u_char *args, const struct pcap_pkthdr *header, const u_char *packet) {
-	printf("\nPacket number %d:\n", count);
+	struct timeval timestamp = header->ts;
+	printf("\nPacket number %d: ", count);
+	printTimestamp(timestamp);
 	count++;
 
 	printPacket(packet, *header);
