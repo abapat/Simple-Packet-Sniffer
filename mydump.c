@@ -42,8 +42,8 @@ void parseUDP(const u_char *packet, int size_ip, uint16_t len, struct my_packet 
 	//printf("\tIP packet size: %d \tTotal header size: %d\n", len, size_ip + size_udp);
 
 	if (size_payload > 0) {
-		p->asciiPayload = calloc(size_payload, sizeof(char));
-		p->hexPayload = calloc(size_payload, sizeof(char));
+		p->asciiPayload = (char*) calloc(size_payload+1, sizeof(char));
+		p->hexPayload = (char*) calloc(size_payload+1, sizeof(char));
 		getPayload(p->asciiPayload, p->hexPayload, payload, size_payload);
 	} 
 
@@ -54,8 +54,8 @@ void parseICMP(const u_char *packet, int size_ip, uint16_t len, struct my_packet
 	p->payloadLen = size_payload;
 	const u_char* payload = (u_char *)(packet + SIZE_ETHERNET_HEADER + size_ip + SIZE_ICMP_HEADER);
 	if (size_payload > 0) {
-		p->asciiPayload = calloc(size_payload, sizeof(char));
-		p->hexPayload = calloc(size_payload, sizeof(char));
+		p->asciiPayload = (char*) calloc(size_payload+1, sizeof(char));
+		p->hexPayload = (char*) calloc(size_payload+1, sizeof(char));
 		getPayload(p->asciiPayload, p->hexPayload, payload, size_payload);
 	}	
 }
@@ -83,8 +83,8 @@ void parseTCP(const u_char *packet, int size_ip, uint16_t len, struct my_packet 
 	//printf("\tIP packet size: %d \tTotal header size: %d\n", len, size_ip + size_tcp);
 
 	if (size_payload > 0) {
-		p->asciiPayload = calloc(size_payload, sizeof(char));
-		p->hexPayload = calloc(size_payload, sizeof(char));
+		p->asciiPayload = (char*) calloc(size_payload+1, sizeof(char));
+		p->hexPayload = (char*) calloc(size_payload+1, sizeof(char));
 		getPayload(p->asciiPayload, p->hexPayload, payload, size_payload);
 	}
 }
@@ -247,10 +247,12 @@ void freeStruct(struct my_packet *p) {
 	
 	if (p->hexPayload != NULL) {
 		free(p->hexPayload);
+		p->hexPayload = NULL;
 	}
 
 	if (p->asciiPayload != NULL) {
-		free(p->asciiPayload);	
+		free(p->asciiPayload);
+		p->asciiPayload = NULL;				
 	}
 	
 }
