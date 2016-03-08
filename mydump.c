@@ -4,8 +4,8 @@
 void printHelp();
 void printPacket(const u_char *packet, struct pcap_pkthdr header);
 void printTimestamp(struct timeval timestamp);
-void printTCP(const u_char *packet, int size_ip, const struct sniff_ip *ip);
-void printUDP(const u_char *packet, int size_ip, const struct sniff_ip *ip);
+void printTCP(const u_char *packet, int size_ip, uint16_t len);
+void printUDP(const u_char *packet, int size_ip, uint16_t len);
 void printPayload(const u_char *payload, int len);
 void packetHandler(u_char *args, const struct pcap_pkthdr *header, const u_char *packet);
 
@@ -23,7 +23,7 @@ void printTimestamp(struct timeval timestamp) {
 	printf("[%s.%06ld]\n", buf, (long int)timestamp.tv_usec);
 }
 
-void printUDP(const u_char *packet, int size_ip, const struct sniff_ip *ip) {
+void printUDP(const u_char *packet, int size_ip, uint16_t len) {
 	const struct udphdr *udp;            /* The UDP header */
 	const u_char *payload;               /* Packet payload */
 	int size_payload;	
@@ -36,9 +36,9 @@ void printUDP(const u_char *packet, int size_ip, const struct sniff_ip *ip) {
 	printf("\tUDP len: %d\n", ntohs(udp->uh_ulen));
 	
 	payload = (u_char *)(packet + SIZE_ETHERNET + size_ip + size_udp);
-	size_payload = ntohs(ip->ip_len) - (size_ip + size_udp);
+	size_payload = len - (size_ip + size_udp);
 
-	printf("\tIP packet size: %d \tTotal header size: %d\n", ntohs(ip->ip_len), size_ip + size_udp);
+	printf("\tIP packet size: %d \tTotal header size: %d\n", len, size_ip + size_udp);
 
 	if (size_payload > 0) {
 		printf("\tPayload (%d bytes)\n", size_payload);
@@ -47,7 +47,7 @@ void printUDP(const u_char *packet, int size_ip, const struct sniff_ip *ip) {
 
 }
 
-void printTCP(const u_char *packet, int size_ip, const struct sniff_ip *ip) {
+void printTCP(const u_char *packet, int size_ip, uint16_t len) {
 	const struct sniff_tcp *tcp;            /* The TCP header */
 	const u_char *payload;                    /* Packet payload */
 
@@ -65,9 +65,9 @@ void printTCP(const u_char *packet, int size_ip, const struct sniff_ip *ip) {
 	printf("\tDst port: %d\n", ntohs(tcp->th_dport));
 	
 	payload = (u_char *)(packet + SIZE_ETHERNET + size_ip + size_tcp);
-	size_payload = ntohs(ip->ip_len) - (size_ip + size_tcp);
+	size_payload = len - (size_ip + size_tcp);
 
-	printf("\tIP packet size: %d \tTotal header size: %d\n", ntohs(ip->ip_len), size_ip + size_tcp);
+	printf("\tIP packet size: %d \tTotal header size: %d\n", len, size_ip + size_tcp);
 	
 	if (size_payload > 0) {
 		printf("\tPayload (%d bytes)\n", size_payload);
@@ -114,6 +114,9 @@ void printPacket(const u_char *packet, struct pcap_pkthdr header) {
 		return;
 	}
 
+	uint16_t len = ntohs(ip->ip_len);
+	printf("\tPacket Length: %u\n", len + SIZE_ETHERNET);
+
 	/* print source and destination IP addresses */
 	printf("\tFrom: %s\n", inet_ntoa(ip->ip_src));
 	printf("\tTo: %s\n", inet_ntoa(ip->ip_dst));
@@ -123,11 +126,11 @@ void printPacket(const u_char *packet, struct pcap_pkthdr header) {
 	switch(ip->ip_p) {
 		case IPPROTO_TCP:
 			printf("TCP\n");
-			printTCP(packet, size_ip, ip);
+			printTCP(packet, size_ip, len);
 			break;
 		case IPPROTO_UDP:
 			printf("UDP\n");
-			printUDP(packet, size_ip, ip);
+			printUDP(packet, size_ip, len);
 			break;
 		case IPPROTO_ICMP:
 			printf("ICMP\n");
