@@ -88,17 +88,17 @@ void printPacket(const u_char *packet, struct pcap_pkthdr header) {
 	printf("\tEthertype: ");
 	switch (type) {
 		case ETHERTYPE_ARP:
-			printf("ARP\n");
+			printf("ARP [%#x]\n", type);
 			break;
 		case ETHERTYPE_IP:
-			printf("IP\n");
+			printf("IP [%#x]\n", type);
 			IP_flag = 1;
 			break;
 		case ETHERTYPE_REVARP:
-			printf("Reverse ARP\n");
+			printf("Reverse ARP [%#x]\n", type);
 			break;
 		default:
-			printf("Other- %u\n", (unsigned int) type);
+			printf("Other [%#x]\n", type);
 			break;
 	}
 	printf("\tSource MAC address: %s\n", ether_ntoa((struct ether_addr*) ethernet->ether_shost));
