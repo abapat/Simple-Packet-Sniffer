@@ -1,6 +1,6 @@
 #Amit Bapat
 
-CFLAGS = -g -Wall -Werror -Wno-pointer-sign
+CFLAGS = -g -Wall -Wno-pointer-sign
 LIBS = -lpcap
 CC = gcc
 OBJ = mydump.o

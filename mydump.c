@@ -24,7 +24,7 @@ void printTimestamp(struct timeval timestamp) {
 
 void printTCP(const u_char *packet, int size_ip, const struct sniff_ip *ip) {
 	const struct sniff_tcp *tcp;            /* The TCP header */
-	const char *payload;                    /* Packet payload */
+	const u_char *payload;                    /* Packet payload */
 
 	int size_tcp;
 	int size_payload;	
@@ -222,4 +222,6 @@ int main(int argc, char** argv) {
 	
 	pcap_freecode(&fp);
 	pcap_close(handle);
+
+	return 0;
 }
