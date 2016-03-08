@@ -5,26 +5,26 @@
 #include <string.h>
 #include <time.h>
 #include <pcap.h>
-#include <arpa/inet.h>
-#include <sys/types.h>
-#include <sys/socket.h>
-#include <net/ethernet.h>
-
-#ifdef LINUX
-#include <netinet/ether.h>
-#endif
- 
-#include <netinet/if_ether.h>
-#include <netinet/in.h>
-#include <netinet/tcp.h>
-#include <netinet/udp.h>
- 
 #include <fcntl.h>
 #include <getopt.h>
 #include <ifaddrs.h>
 #include <netdb.h>
 #include <signal.h>
 #include <syslog.h>
+
+#include <arpa/inet.h>
+#include <sys/types.h>
+#include <sys/socket.h>
+#include <net/ethernet.h>
+#include <netinet/if_ether.h>
+#include <netinet/in.h>
+#include <netinet/tcp.h>
+#include <netinet/udp.h>
+
+#ifdef __linux__
+#include <netinet/ether.h>
+#endif 
+ 
 /* ethernet headers are always exactly 14 bytes [1] */
 #define SIZE_ETHERNET 14
 

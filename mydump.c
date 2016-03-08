@@ -131,7 +131,7 @@ void packetHandler(u_char *args, const struct pcap_pkthdr *header, const u_char 
 int main(int argc, char** argv) {
 	bpf_u_int32 mask;			// The netmask of our sniffing device 
 	bpf_u_int32 ip;				// The IP of our sniffing device 
-	struct bpf_program fp;      // The compiled filter expression
+	struct bpf_program fp;		// The compiled filter expression
 	int numPackets = 10;		// How many packets to sniff for
 
 	char* interface = NULL;
@@ -219,8 +219,10 @@ int main(int argc, char** argv) {
 	//packet capture
 	pcap_loop(handle, numPackets, packetHandler, NULL);
 	
-	
-	pcap_freecode(&fp);
+	if (filter != NULL) {
+		pcap_freecode(&fp);
+	}
+
 	pcap_close(handle);
 
 	return 0;
