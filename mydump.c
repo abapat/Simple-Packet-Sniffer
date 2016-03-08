@@ -19,7 +19,7 @@ void printTimestamp(struct timeval timestamp) {
 	char buf[64];
 	struct tm* now = localtime(&(timestamp.tv_sec));
 	strftime(buf, sizeof buf, "%Y-%m-%d %H:%M:%S", now);
-	printf("[%s.%06d]\n", buf, timestamp.tv_usec);
+	printf("[%s.%06ld]\n", buf, (long int)timestamp.tv_usec);
 }
 
 void printTCP(const u_char *packet, int size_ip, const struct sniff_ip *ip) {
