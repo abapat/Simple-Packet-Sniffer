@@ -6,6 +6,9 @@
 #include <time.h>
 #include <pcap.h>
 #include <arpa/inet.h>
+#include <sys/types.h>
+#include <sys/socket.h>
+#include <net/ethernet.h>
 
 #ifdef LINUX
 #include <netinet/ether.h>
@@ -24,9 +27,6 @@
 #include <syslog.h>
 /* ethernet headers are always exactly 14 bytes [1] */
 #define SIZE_ETHERNET 14
-
-/* Ethernet addresses are 6 bytes */
-#define ETHER_ADDR_LEN	6
 
 /* IP header */
 struct sniff_ip {
