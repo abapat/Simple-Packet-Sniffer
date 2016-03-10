@@ -11,6 +11,7 @@
 #include <netdb.h>
 #include <signal.h>
 #include <syslog.h>
+#include <ctype.h>
 
 #include <arpa/inet.h>
 #include <sys/types.h>

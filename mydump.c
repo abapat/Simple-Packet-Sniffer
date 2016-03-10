@@ -38,12 +38,12 @@ void printUDP(const u_char *packet, int size_ip, uint16_t len) {
 	payload = (u_char *)(packet + SIZE_ETHERNET + size_ip + size_udp);
 	size_payload = len - (size_ip + size_udp);
 
-	printf("\tIP packet size: %d \tTotal header size: %d\n", len, size_ip + size_udp);
+	//printf("\tIP packet size: %d \tTotal header size: %d\n", len, size_ip + size_udp);
 
 	if (size_payload > 0) {
-		printf("\tPayload (%d bytes)\n", size_payload);
-		//printf("\t%s", payload);
-	}
+		printf("\tPayload (%d bytes):\n", size_payload);
+		printPayload(payload, size_payload);
+	} 
 
 }
 
@@ -67,12 +67,23 @@ void printTCP(const u_char *packet, int size_ip, uint16_t len) {
 	payload = (u_char *)(packet + SIZE_ETHERNET + size_ip + size_tcp);
 	size_payload = len - (size_ip + size_tcp);
 
-	printf("\tIP packet size: %d \tTotal header size: %d\n", len, size_ip + size_tcp);
-	
+	//printf("\tIP packet size: %d \tTotal header size: %d\n", len, size_ip + size_tcp);
+
 	if (size_payload > 0) {
-		printf("\tPayload (%d bytes)\n", size_payload);
-		//printf("\t%s", payload);
+		printf("\tPayload (%d bytes):\n", size_payload);
+		printPayload(payload, size_payload);
 	}
+}
+
+void printPayload(const u_char *payload, int len) {
+	int i;
+	for(i = 0; i < len; i++) {
+		if (isprint(*(payload+i)))
+			printf("%c", *(payload+i));
+		else
+			printf(".");
+	}
+	printf("\n");
 }
 
 void printPacket(const u_char *packet, struct pcap_pkthdr header) {	
