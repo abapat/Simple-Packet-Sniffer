@@ -26,10 +26,12 @@
 #include <netinet/ether.h>
 #endif 
  
-/* ethernet headers are always exactly 14 bytes */
-#define SIZE_ETHERNET 14
-/* UDP headers are always exactly 8 bytes */
+/* ethernet headers are 14 bytes */
+#define SIZE_ETHERNET_HEADER 14
+/* UDP headers are 8 bytes */
 #define SIZE_UDP_HEADER 8
+/* UDP headers are 8 bytes */
+#define SIZE_ICMP_HEADER 8
 
 /* IP header */
 struct sniff_ip {

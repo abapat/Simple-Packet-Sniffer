@@ -6,6 +6,7 @@ void printPacket(const u_char *packet, struct pcap_pkthdr header);
 void printTimestamp(struct timeval timestamp);
 void printTCP(const u_char *packet, int size_ip, uint16_t len);
 void printUDP(const u_char *packet, int size_ip, uint16_t len);
+void printICMP(const u_char *packet, int size_ip, uint16_t len);
 void printPayload(const u_char *payload, int len);
 void packetHandler(u_char *args, const struct pcap_pkthdr *header, const u_char *packet);
 
@@ -29,13 +30,13 @@ void printUDP(const u_char *packet, int size_ip, uint16_t len) {
 	int size_payload;	
 	int size_udp = SIZE_UDP_HEADER;
 
-	udp = (struct udphdr*)(packet + SIZE_ETHERNET + size_ip);
+	udp = (struct udphdr*)(packet + SIZE_ETHERNET_HEADER + size_ip);
 	
 	printf("\tSrc port: %d\n", ntohs(udp->uh_sport));
 	printf("\tDst port: %d\n", ntohs(udp->uh_dport));
 	printf("\tUDP len: %d\n", ntohs(udp->uh_ulen));
 	
-	payload = (u_char *)(packet + SIZE_ETHERNET + size_ip + size_udp);
+	payload = (u_char *)(packet + SIZE_ETHERNET_HEADER + size_ip + size_udp);
 	size_payload = len - (size_ip + size_udp);
 
 	//printf("\tIP packet size: %d \tTotal header size: %d\n", len, size_ip + size_udp);
@@ -47,6 +48,15 @@ void printUDP(const u_char *packet, int size_ip, uint16_t len) {
 
 }
 
+void printICMP(const u_char *packet, int size_ip, uint16_t len) {
+	int size_payload = len - (size_ip + SIZE_ICMP_HEADER);
+	const u_char* payload = (u_char *)(packet + SIZE_ETHERNET_HEADER + size_ip + SIZE_ICMP_HEADER);
+	if (size_payload > 0) {
+		printf("\tPayload (%d bytes):\n", size_payload);
+		printPayload(payload, size_payload);
+	}	
+}
+
 void printTCP(const u_char *packet, int size_ip, uint16_t len) {
 	const struct sniff_tcp *tcp;            /* The TCP header */
 	const u_char *payload;                    /* Packet payload */
@@ -54,7 +64,7 @@ void printTCP(const u_char *packet, int size_ip, uint16_t len) {
 	int size_tcp;
 	int size_payload;	
 	
-	tcp = (struct sniff_tcp*)(packet + SIZE_ETHERNET + size_ip);
+	tcp = (struct sniff_tcp*)(packet + SIZE_ETHERNET_HEADER + size_ip);
 	size_tcp = TH_OFF(tcp)*4;
 	if (size_tcp < 20) {
 		printf("\tError: Invalid TCP header length: %u bytes\n", size_tcp);
@@ -64,7 +74,7 @@ void printTCP(const u_char *packet, int size_ip, uint16_t len) {
 	printf("\tSrc port: %d\n", ntohs(tcp->th_sport));
 	printf("\tDst port: %d\n", ntohs(tcp->th_dport));
 	
-	payload = (u_char *)(packet + SIZE_ETHERNET + size_ip + size_tcp);
+	payload = (u_char *)(packet + SIZE_ETHERNET_HEADER + size_ip + size_tcp);
 	size_payload = len - (size_ip + size_tcp);
 
 	//printf("\tIP packet size: %d \tTotal header size: %d\n", len, size_ip + size_tcp);
@@ -76,12 +86,21 @@ void printTCP(const u_char *packet, int size_ip, uint16_t len) {
 }
 
 void printPayload(const u_char *payload, int len) {
-	int i;
+	int i, n;
+	int line = 16;
+	printf("\t");
 	for(i = 0; i < len; i++) {
-		if (isprint(*(payload+i)))
-			printf("%c", *(payload+i));
-		else
-			printf(".");
+		printf("%02x ", *(payload+i));
+		if (i != 0 && (i % line == 0)) {
+			printf(" "); //print ASCII
+			for (n = i - line; n < i; n++) {
+				if (isprint(*(payload+n)))
+					printf("%c", *(payload+n));
+				else
+					printf(".");
+			}
+			printf("\n\t");
+		}
 	}
 	printf("\n");
 }
@@ -118,7 +137,7 @@ void printPacket(const u_char *packet, struct pcap_pkthdr header) {
 		return;
 
 	/* define/compute ip header offset */
-	ip = (struct sniff_ip*)(packet + SIZE_ETHERNET);
+	ip = (struct sniff_ip*)(packet + SIZE_ETHERNET_HEADER);
 	size_ip = IP_HL(ip)*4;
 	if (size_ip < 20) {
 		printf("\tError: Invalid IP header length: %u bytes\n", size_ip);
@@ -126,7 +145,7 @@ void printPacket(const u_char *packet, struct pcap_pkthdr header) {
 	}
 
 	uint16_t len = ntohs(ip->ip_len);
-	printf("\tPacket Length: %u\n", len + SIZE_ETHERNET);
+	printf("\tPacket Length: %u\n", len + SIZE_ETHERNET_HEADER);
 
 	/* print source and destination IP addresses */
 	printf("\tFrom: %s\n", inet_ntoa(ip->ip_src));
@@ -145,6 +164,7 @@ void printPacket(const u_char *packet, struct pcap_pkthdr header) {
 			break;
 		case IPPROTO_ICMP:
 			printf("ICMP\n");
+			printICMP(packet, size_ip, len);
 			break;
 		default:
 			printf("Other\n");
