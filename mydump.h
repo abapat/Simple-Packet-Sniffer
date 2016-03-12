@@ -76,3 +76,19 @@ struct sniff_tcp {
         u_short th_sum;                 /* checksum */
         u_short th_urp;                 /* urgent pointer */
 };
+
+struct my_packet {
+        char* timestamp;
+        uint16_t etherType;
+        char* sourceMAC;
+        char* destMAC;
+        uint16_t packetLen;
+        char* sourceIP;
+        char* destIP;
+        char* protocol;
+        uint16_t sourcePort;
+        uint16_t destPort;
+        int payloadLen;
+        char* asciiPayload;
+        char* hexPayload;
+};

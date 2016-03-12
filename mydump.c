@@ -2,13 +2,14 @@
 #include "mydump.h"
 
 void printHelp();
-void printPacket(const u_char *packet, struct pcap_pkthdr header);
-void printTimestamp(struct timeval timestamp);
-void printTCP(const u_char *packet, int size_ip, uint16_t len);
-void printUDP(const u_char *packet, int size_ip, uint16_t len);
-void printICMP(const u_char *packet, int size_ip, uint16_t len);
-void printPayload(const u_char *payload, int len);
+void getTimestamp(struct timeval timestamp, char* str);
+void parseTCP(const u_char *packet, int size_ip, uint16_t len, struct my_packet *p);
+void parseUDP(const u_char *packet, int size_ip, uint16_t len, struct my_packet *p);
+void parseICMP(const u_char *packet, int size_ip, uint16_t len, struct my_packet *p);
+void printPacket(struct my_packet *p);
+void getPayload(char* asciiBuf, char* hexBuf, const u_char *payload, int len);
 void packetHandler(u_char *args, const struct pcap_pkthdr *header, const u_char *packet);
+void freeStruct(struct my_packet *p);
 
 static int count = 1;                   /* packet counter */
 
@@ -17,14 +18,14 @@ void printHelp() {
 	exit(0);
 }
 
-void printTimestamp(struct timeval timestamp) {
+void getTimestamp(struct timeval timestamp, char* str) {
 	char buf[64];
 	struct tm* now = localtime(&(timestamp.tv_sec));
 	strftime(buf, sizeof buf, "%Y-%m-%d %H:%M:%S", now);
-	printf("[%s.%06ld]\n", buf, (long int)timestamp.tv_usec);
+	sprintf(str, "[%s.%06ld]\n", buf, (long int)timestamp.tv_usec);
 }
 
-void printUDP(const u_char *packet, int size_ip, uint16_t len) {
+void parseUDP(const u_char *packet, int size_ip, uint16_t len, struct my_packet *p) {
 	const struct udphdr *udp;            /* The UDP header */
 	const u_char *payload;               /* Packet payload */
 	int size_payload;	
@@ -32,32 +33,34 @@ void printUDP(const u_char *packet, int size_ip, uint16_t len) {
 
 	udp = (struct udphdr*)(packet + SIZE_ETHERNET_HEADER + size_ip);
 	
-	printf("\tSrc port: %d\n", ntohs(udp->uh_sport));
-	printf("\tDst port: %d\n", ntohs(udp->uh_dport));
-	printf("\tUDP len: %d\n", ntohs(udp->uh_ulen));
+	p->sourcePort = ntohs(udp->uh_sport);
+	p->destPort = ntohs(udp->uh_dport);
 	
 	payload = (u_char *)(packet + SIZE_ETHERNET_HEADER + size_ip + size_udp);
 	size_payload = len - (size_ip + size_udp);
-
+	p->payloadLen = size_payload;
 	//printf("\tIP packet size: %d \tTotal header size: %d\n", len, size_ip + size_udp);
 
 	if (size_payload > 0) {
-		printf("\tPayload (%d bytes):\n", size_payload);
-		printPayload(payload, size_payload);
+		p->asciiPayload = calloc(size_payload, sizeof(char));
+		p->hexPayload = calloc(size_payload, sizeof(char));
+		getPayload(p->asciiPayload, p->hexPayload, payload, size_payload);
 	} 
 
 }
 
-void printICMP(const u_char *packet, int size_ip, uint16_t len) {
+void parseICMP(const u_char *packet, int size_ip, uint16_t len, struct my_packet *p) {
 	int size_payload = len - (size_ip + SIZE_ICMP_HEADER);
+	p->payloadLen = size_payload;
 	const u_char* payload = (u_char *)(packet + SIZE_ETHERNET_HEADER + size_ip + SIZE_ICMP_HEADER);
 	if (size_payload > 0) {
-		printf("\tPayload (%d bytes):\n", size_payload);
-		printPayload(payload, size_payload);
+		p->asciiPayload = calloc(size_payload, sizeof(char));
+		p->hexPayload = calloc(size_payload, sizeof(char));
+		getPayload(p->asciiPayload, p->hexPayload, payload, size_payload);
 	}	
 }
 
-void printTCP(const u_char *packet, int size_ip, uint16_t len) {
+void parseTCP(const u_char *packet, int size_ip, uint16_t len, struct my_packet *p) {
 	const struct sniff_tcp *tcp;            /* The TCP header */
 	const u_char *payload;                    /* Packet payload */
 
@@ -71,123 +74,190 @@ void printTCP(const u_char *packet, int size_ip, uint16_t len) {
 		return;
 	}
 	
-	printf("\tSrc port: %d\n", ntohs(tcp->th_sport));
-	printf("\tDst port: %d\n", ntohs(tcp->th_dport));
+	p->sourcePort = ntohs(tcp->th_sport);
+	p->destPort = ntohs(tcp->th_dport);
 	
 	payload = (u_char *)(packet + SIZE_ETHERNET_HEADER + size_ip + size_tcp);
 	size_payload = len - (size_ip + size_tcp);
-
+	p->payloadLen = size_payload;
 	//printf("\tIP packet size: %d \tTotal header size: %d\n", len, size_ip + size_tcp);
 
 	if (size_payload > 0) {
-		printf("\tPayload (%d bytes):\n", size_payload);
-		printPayload(payload, size_payload);
+		p->asciiPayload = calloc(size_payload, sizeof(char));
+		p->hexPayload = calloc(size_payload, sizeof(char));
+		getPayload(p->asciiPayload, p->hexPayload, payload, size_payload);
 	}
 }
 
-void printPayload(const u_char *payload, int len) {
-	int i, n;
-	int line = 16;
-	printf("\t");
-	for(i = 0; i < len; i++) {
-		printf("%02x ", *(payload+i));
-		if (i != 0 && (i % line == 0)) {
-			printf(" "); //print ASCII
-			for (n = i - line; n < i; n++) {
-				if (isprint(*(payload+n)))
-					printf("%c", *(payload+n));
-				else
-					printf(".");
+void getPayload(char* asciiBuf, char* hexBuf, const u_char *payload, int len) {
+	int x;
+	for (x = 0; x < len; x++) {
+		if (isprint(*(payload+x)))
+			sprintf(asciiBuf+x, "%c", *(payload+x));
+		else
+			asciiBuf[x] = '.';
+
+		//sprintf(hexBuf+x, "%02x ", *(payload+x));
+	}
+
+	memcpy(hexBuf, payload, len);
+}
+
+void printPacket(struct my_packet *p) {
+	int IPflag = 0;
+	printf("\nPacket %d %s\n", count, p->timestamp);
+	count++;
+
+	printf("\tEthertype: ");
+	switch (p->etherType) {
+		case ETHERTYPE_ARP:
+			printf("ARP [%#x]\n", p->etherType);
+			break;
+		case ETHERTYPE_IP:
+			printf("IP [%#x]\n", p->etherType);
+			IPflag = 1;
+			break;
+		case ETHERTYPE_REVARP:
+			printf("Reverse ARP [%#x]\n", p->etherType);
+			break;
+		default:
+			printf("Other [%#x]\n", p->etherType);
+			break;
+	}
+
+	printf("\tSource MAC address: %s\n", p->sourceMAC);
+	printf("\tDestination MAC address: %s\n", p->destMAC);
+
+	if (IPflag == 0)
+		return;
+
+	printf("\tPacket Length: %u\n", p->packetLen);
+	printf("\tFrom: %s\n", p->sourceIP);
+	printf("\tTo: %s\n", p->destIP);
+	printf("\tProtocol: %s", p->protocol);
+	
+	if (p->sourcePort != 0)
+		printf("\tSource port: %d\n", p->sourcePort);
+	if (p->destPort != 0)
+		printf("\tDest port: %d\n", p->destPort);
+	if (p->payloadLen > 0) {
+		printf("\tPayload (%d bytes):\n", p->payloadLen);
+		int x = 0;
+		int len = p->payloadLen;
+		while (x < len) {
+			int y;
+			int start = x;
+			printf("\t");
+			for (y = 0; y < 16 && x < len; y++){
+				printf("%02x ", *(p->hexPayload+x) & 0xff);
+				x++;
 			}
-			printf("\n\t");
+			if (y < 16) {
+				for (; y < 16; y++) {
+					printf("   ");
+				}
+			}
+			x = start;
+			printf(" ");
+			for (y = 0; y < 16 && x < len; y++) {
+				printf("%c", *(p->asciiPayload+x));
+				x++;
+			}
+			printf("\n");
 		}
 	}
-	printf("\n");
 }
 
-void printPacket(const u_char *packet, struct pcap_pkthdr header) {	
-	/* declare pointers to packet headers */
+void packetHandler(u_char *args, const struct pcap_pkthdr *header, const u_char *packet) {
+	char* searchStr = (char*) args;
 	const struct ether_header *ethernet;  /* The ethernet header */
 	const struct sniff_ip *ip;              /* The IP header */
+	struct my_packet p;
+	p.hexPayload = NULL;
+	p.asciiPayload = NULL;
+
+	char buf[64];
+	struct timeval timestamp = header->ts;
+	getTimestamp(timestamp, buf);
+	p.timestamp = buf;
 
 	int size_ip;
-	int IP_flag = 0;
 	/* define ethernet header */
 	ethernet = (struct ether_header*)(packet);
 	uint16_t type = ntohs(ethernet->ether_type);
-	printf("\tEthertype: ");
-	switch (type) {
-		case ETHERTYPE_ARP:
-			printf("ARP [%#x]\n", type);
-			break;
-		case ETHERTYPE_IP:
-			printf("IP [%#x]\n", type);
-			IP_flag = 1;
-			break;
-		case ETHERTYPE_REVARP:
-			printf("Reverse ARP [%#x]\n", type);
-			break;
-		default:
-			printf("Other [%#x]\n", type);
-			break;
-	}
-	printf("\tSource MAC address: %s\n", ether_ntoa((struct ether_addr*) ethernet->ether_shost));
-	printf("\tDestination MAC address: %s\n", ether_ntoa((struct ether_addr*) ethernet->ether_dhost));
-	if (IP_flag == 0)
-		return;
+	p.etherType = type;
 
-	/* define/compute ip header offset */
+	p.sourceMAC = ether_ntoa((struct ether_addr*) ethernet->ether_shost);
+	p.destMAC = ether_ntoa((struct ether_addr*) ethernet->ether_dhost);
+
 	ip = (struct sniff_ip*)(packet + SIZE_ETHERNET_HEADER);
 	size_ip = IP_HL(ip)*4;
 	if (size_ip < 20) {
 		printf("\tError: Invalid IP header length: %u bytes\n", size_ip);
+		printPacket(&p);
 		return;
 	}
-
 	uint16_t len = ntohs(ip->ip_len);
-	printf("\tPacket Length: %u\n", len + SIZE_ETHERNET_HEADER);
-
-	/* print source and destination IP addresses */
-	printf("\tFrom: %s\n", inet_ntoa(ip->ip_src));
-	printf("\tTo: %s\n", inet_ntoa(ip->ip_dst));
-	
-	/* determine protocol */
-	printf("\tProtocol: ");	
+	p.packetLen = len + SIZE_ETHERNET_HEADER;
+	p.sourceIP = inet_ntoa(ip->ip_src);
+	p.destIP = inet_ntoa(ip->ip_dst);
+	//printf("getting protocol\n");
+	/* determine protocol */	
 	switch(ip->ip_p) {
 		case IPPROTO_TCP:
-			printf("TCP\n");
-			printTCP(packet, size_ip, len);
+			p.protocol = "TCP";
+			parseTCP(packet, size_ip, len, &p);
 			break;
 		case IPPROTO_UDP:
-			printf("UDP\n");
-			printUDP(packet, size_ip, len);
+			p.protocol = "UDP";
+			parseUDP(packet, size_ip, len, &p);
 			break;
 		case IPPROTO_ICMP:
-			printf("ICMP\n");
-			printICMP(packet, size_ip, len);
+			p.protocol = "ICMP";
+			parseICMP(packet, size_ip, len, &p);
 			break;
 		default:
-			printf("Other\n");
+			p.protocol = "Other";
 			break;
 	}
-	
+	//printf("checking arg\n");
+	//check arg -s
+	if (searchStr != NULL) {
+		//printf("Packet Length: %d", p.packetLen);
+		if (p.packetLen <= 0) {
+			freeStruct(&p);
+			return;
+		}
+
+		if (strstr(p.asciiPayload, searchStr) == NULL) {
+			freeStruct(&p);
+			return;
+		}
+		//else
+		//	printf("NO MATCH: %s\n", p.asciiPayload);
+	}
+	//print packet
+	printPacket(&p);
+	printf("\n");
+
+	freeStruct(&p);
 }
 
-void packetHandler(u_char *args, const struct pcap_pkthdr *header, const u_char *packet) {
-	struct timeval timestamp = header->ts;
-	printf("\nPacket %d ", count);
-	printTimestamp(timestamp);
-	count++;
+void freeStruct(struct my_packet *p) {
+	
+	if (p->hexPayload != NULL)
+		free(p->hexPayload);
 
-	printPacket(packet, *header);
-	printf("\n");
+	if (p->asciiPayload != NULL)
+		free(p->asciiPayload);	
+	
 }
 
 int main(int argc, char** argv) {
 	bpf_u_int32 mask;			// The netmask of our sniffing device 
 	bpf_u_int32 ip;				// The IP of our sniffing device 
 	struct bpf_program fp;		// The compiled filter expression
-	int numPackets = 10;		// How many packets to sniff for
+	int numPackets = 0;		// How many packets to sniff for
 
 	char* interface = NULL;
 	char* file = NULL;
@@ -236,10 +306,8 @@ int main(int argc, char** argv) {
 	if (file != NULL) {
 		//TODO read file
 	} else if (interface != NULL) {
-		//open interface
 		dev = interface;
 	} else {
-		//use default interface
 		dev = pcap_lookupdev(errbuf);
 		if (dev == NULL) {
 			fprintf(stderr, "Couldn't find default device: %s\n", errbuf);
@@ -272,7 +340,7 @@ int main(int argc, char** argv) {
 		}
 	}
 	//packet capture
-	pcap_loop(handle, numPackets, packetHandler, NULL);
+	pcap_loop(handle, numPackets, packetHandler, str);
 	
 	if (filter != NULL) {
 		pcap_freecode(&fp);
