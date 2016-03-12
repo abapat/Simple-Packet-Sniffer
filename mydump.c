@@ -134,7 +134,7 @@ void printPacket(struct my_packet *p) {
 	printf("\tPacket Length: %u\n", p->packetLen);
 	printf("\tFrom: %s\n", p->sourceIP);
 	printf("\tTo: %s\n", p->destIP);
-	printf("\tProtocol: %s", p->protocol);
+	printf("\tProtocol: %s\n", p->protocol);
 	
 	if (p->sourcePort != 0)
 		printf("\tSource port: %d\n", p->sourcePort);
@@ -194,7 +194,8 @@ void packetHandler(u_char *args, const struct pcap_pkthdr *header, const u_char 
 	size_ip = IP_HL(ip)*4;
 	if (size_ip < 20) {
 		//printf("\tError: Invalid IP header length: %u bytes\n", size_ip);
-		printPacket(&p);
+		if (searchStr == NULL)
+			printPacket(&p);
 		return;
 	}
 	uint16_t len = ntohs(ip->ip_len);
@@ -224,12 +225,12 @@ void packetHandler(u_char *args, const struct pcap_pkthdr *header, const u_char 
 	//check arg -s
 	if (searchStr != NULL) {
 		//printf("Packet Length: %d", p.packetLen);
-		if (p.packetLen <= 0) {
+		if (p.payloadLen <= 0) {
 			freeStruct(&p);
 			return;
 		}
 
-		if (strstr(p.asciiPayload, searchStr) == NULL) {
+		if (p.asciiPayload != NULL && strstr(p.asciiPayload, searchStr) == NULL) {
 			freeStruct(&p);
 			return;
 		}
