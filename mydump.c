@@ -105,7 +105,7 @@ void getPayload(char* asciiBuf, char* hexBuf, const u_char *payload, int len) {
 
 void printPacket(struct my_packet *p) {
 	int IPflag = 0;
-	printf("\nPacket %d %s\n", count, p->timestamp);
+	printf("\nPacket %d %s", count, p->timestamp);
 	count++;
 
 	printf("\tEthertype: ");
@@ -193,7 +193,7 @@ void packetHandler(u_char *args, const struct pcap_pkthdr *header, const u_char 
 	ip = (struct sniff_ip*)(packet + SIZE_ETHERNET_HEADER);
 	size_ip = IP_HL(ip)*4;
 	if (size_ip < 20) {
-		printf("\tError: Invalid IP header length: %u bytes\n", size_ip);
+		//printf("\tError: Invalid IP header length: %u bytes\n", size_ip);
 		printPacket(&p);
 		return;
 	}
@@ -245,11 +245,13 @@ void packetHandler(u_char *args, const struct pcap_pkthdr *header, const u_char 
 
 void freeStruct(struct my_packet *p) {
 	
-	if (p->hexPayload != NULL)
+	if (p->hexPayload != NULL) {
 		free(p->hexPayload);
+	}
 
-	if (p->asciiPayload != NULL)
+	if (p->asciiPayload != NULL) {
 		free(p->asciiPayload);	
+	}
 	
 }
 
@@ -296,15 +298,15 @@ int main(int argc, char** argv) {
 
 	printf("interface = %s, file = %s, string = %s, expression = %s\n", interface, file, str, filter);
 
-	if (interface != NULL && file != NULL) {
-		fprintf(stderr, "Error: Please select an interface or file to listen to");
-		printHelp();
-	}
-
 	char *dev = NULL, errbuf[PCAP_ERRBUF_SIZE];
+	pcap_t *handle;
 
 	if (file != NULL) {
-		//TODO read file
+		handle = pcap_open_offline(file, errbuf);
+		if (handle == NULL) {
+			fprintf(stderr, "error reading pcap file: %s\n", errbuf);
+			return(1);
+		}
 	} else if (interface != NULL) {
 		dev = interface;
 	} else {
@@ -316,10 +318,10 @@ int main(int argc, char** argv) {
 	}
 	
 	printf("Device: %s\n", dev);
-	
-	pcap_t *handle;
 
-	handle = pcap_open_live(dev, BUFSIZ, 1, 1000, errbuf);
+	if (file == NULL)
+		handle = pcap_open_live(dev, BUFSIZ, 1, 1000, errbuf);
+	
 	if (handle == NULL) {
 		fprintf(stderr, "Couldn't open device %s: %s\n", dev, errbuf);
 		return(1);
